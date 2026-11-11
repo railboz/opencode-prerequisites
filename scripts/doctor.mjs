@@ -433,7 +433,9 @@ if (hasOc && process.platform !== "win32") {
 // OpenCode log: plugin failure reasons (the Plugins panel only shows "failed")
 if (hasOc) {
   const dp = runOc(["debug", "paths"], 15000)
-  const logDir = ((dp.stdout ?? "") + (dp.stderr ?? "")).split("\n").map((l) => l.match(/(\/[^\s"']*\/log[^\s"']*)/)?.[1]).find((p) => p && fs.existsSync(p) && fs.statSync(p).isDirectory())
+  // Read the "log" line only: a greedy "/.../log..." regex matched $HOME (/home/logan) when the
+  // user name starts with "log", and readFileSync() then got a directory (EISDIR).
+  const logDir = ((dp.stdout ?? "") + (dp.stderr ?? "")).split("\n").map((l) => l.match(/^\s*log\s+(\/\S+)\s*$/)?.[1]).find((p) => p && fs.existsSync(p) && fs.statSync(p).isDirectory())
   if (logDir) {
     const files = fs.readdirSync(logDir).map((f) => ({ f, t: fs.statSync(path.join(logDir, f)).mtimeMs })).sort((a, b) => b.t - a.t)
     if (files[0]) {

@@ -259,6 +259,21 @@ check("--fix: config directory 700 and opencode.jsonc 600",
   `dir ${(fs.statSync(cfg).mode & 0o777).toString(8)} | file ${(fs.statSync(cfgFile).mode & 0o777).toString(8)}`)
 check("--fix: permissions counted as one fix", /fixed: 1, skipped: 0/.test(r.stdout), r.stdout.slice(-300))
 
+// ---------- 12. regression: HOME containing "/log" must not break the log read ----------
+// A greedy /.../log... regex matched the "home /home/logan" line, then readFileSync() got a
+// directory (EISDIR). The log path must come from the "log" line only.
+setConfig({ jsonc: HEALTHY })
+const logHome = path.join(tmp, "home-logan")
+fs.mkdirSync(path.join(logHome, ".cache"), { recursive: true })
+const realLogDir = path.join(tmp, "logs-real")
+fs.mkdirSync(realLogDir, { recursive: true })
+fs.writeFileSync(path.join(realLogDir, "opencode.log"), "timestamp=2026-01-01T00:00:00.000Z level=INFO msg=ok\n")
+const pathsOut = `home ${logHome}\ndata ${path.join(logHome, ".local", "share", "opencode")}\nlog ${realLogDir}\n`
+r = runDoctor({ env: { FAKE_OC_LOGS: pathsOut } })
+const logOut = r.stdout + r.stderr
+check("regression: home path containing /log does not break the log read",
+  r.status === 0 && logOut.includes(`OpenCode log (${path.join(realLogDir, "opencode.log")})`), logOut.slice(-500))
+
 fs.rmSync(tmp, { recursive: true, force: true })
 console.log(failed ? `\n❌ ${failed} check(s) failed` : `\n✅ offline doctor OK (${passed} checks)`)
 process.exit(failed ? 1 : 0)
